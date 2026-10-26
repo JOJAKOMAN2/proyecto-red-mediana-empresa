@@ -1,0 +1,133 @@
+============================================================
+PRUEBAS DE CONECTIVIDAD Y VERIFICACION - PNETLab
+============================================================
+
+------------------------------------------------------------
+1. ESTADO DE CADA EQUIPO
+------------------------------------------------------------
+
+[SW-ACC1 y SW-ACC2]
+show vlan brief
+   -> VLANs 10, 20, 30, 40 y 99 activas; e0/1 y e0/2 en la VLAN de su PC
+show interfaces trunk
+   -> e0/0 y e0/3 en modo trunk con las cinco VLANs
+show spanning-tree vlan 10
+   -> el root es CORE1; un uplink Root y el otro Altn
+
+[CORE1]
+show etherchannel summary
+   -> Po1(SU) con Et0/1(P) y Et0/2(P)
+show spanning-tree vlan 10
+   -> "This bridge is the root"
+show standby brief
+   -> Active en VLAN 10, 30 y 99; Standby en VLAN 20 y 40
+show ip ospf neighbor
+   -> un vecino FULL: R-EDGE 3.3.3.3
+show ip route ospf
+   -> O*E2 0.0.0.0/0 por R-EDGE
+
+[CORE2]
+show etherchannel summary
+   -> Po1(SU) con Et0/1(P) y Et0/2(P)
+show spanning-tree vlan 20
+   -> "This bridge is the root"
+show standby brief
+   -> Active en VLAN 20 y 40; Standby en VLAN 10, 30 y 99
+show ip ospf neighbor
+   -> un vecino FULL: R-EDGE 3.3.3.3
+show ip route ospf
+   -> O*E2 0.0.0.0/0 por R-EDGE
+
+[R-EDGE]
+show ip ospf neighbor
+   -> vecinos FULL: 1.1.1.1 (CORE1) y 2.2.2.2 (CORE2)
+show ip route
+   -> S* 0.0.0.0/0 via 200.0.0.2 y rutas O a las cinco redes 192.168.x.0/24
+ping 8.8.8.8
+   -> 5/5 respuestas
+
+[R-ISP]
+show ip interface brief
+   -> Ethernet0/0 200.0.0.2 up/up y Loopback0 8.8.8.8 up/up
+ping 192.168.10.10
+   -> respuesta (rutas estaticas de retorno)
+
+------------------------------------------------------------
+2. CONECTIVIDAD ENTRE PCs (consola VPCS de cada PC)
+------------------------------------------------------------
+
+[TI - 192.168.20.10]
+ping 192.168.10.10        -> responde
+ping 192.168.30.10        -> responde
+ping 192.168.40.10        -> responde
+ping 192.168.99.11        -> responde
+ping 192.168.99.12        -> responde
+ping 8.8.8.8              -> responde
+
+[GERENCIA - 192.168.40.10]
+ping 192.168.10.10        -> responde (retorno permitido por ACL_VENTAS)
+ping 192.168.20.10        -> responde
+ping 192.168.30.10        -> responde
+ping 8.8.8.8              -> responde
+
+[VENTAS - 192.168.10.10]
+ping 192.168.20.10        -> responde
+ping 192.168.30.10        -> FALLA (denegado por ACL_VENTAS)
+ping 192.168.40.10        -> FALLA (denegado por ACL_VENTAS)
+ping 192.168.99.11        -> FALLA (denegado por ACL_VENTAS)
+ping 8.8.8.8              -> responde
+
+[FINANZAS - 192.168.30.10]
+ping 192.168.20.10        -> responde
+ping 192.168.40.10        -> responde
+ping 192.168.10.10        -> FALLA (denegado por ACL_FINANZAS)
+ping 192.168.99.11        -> FALLA (denegado por ACL_FINANZAS)
+ping 8.8.8.8              -> responde
+
+[CORE1 - despues de los pings fallidos]
+show access-lists
+   -> contadores (matches) incrementados en las lineas deny
+
+------------------------------------------------------------
+3. FALLAS CONTROLADAS
+------------------------------------------------------------
+Antes de cada prueba: en la PC VENTAS ejecutar  ping 8.8.8.8 -t
+
+[3.1 Failover de HSRP]
+CORE1:
+   configure terminal
+   interface vlan 10
+   shutdown
+CORE2:
+   show standby brief
+   -> CORE2 pasa a Active en la VLAN 10; el ping pierde pocos paquetes y continua
+Restaurar en CORE1:
+   no shutdown
+   -> CORE1 recupera Active por preempt
+
+[3.2 Falla de un enlace del EtherChannel]
+CORE1:
+   configure terminal
+   interface ethernet0/1
+   shutdown
+   show etherchannel summary
+   -> Po1(SU) se mantiene con un solo puerto; el ping no se corta
+Restaurar:
+   no shutdown
+
+[3.3 Falla de un uplink de acceso]
+SW-ACC1:
+   configure terminal
+   interface ethernet0/0
+   shutdown
+   show spanning-tree vlan 10
+   -> RSTP reenvia por e0/3 hacia CORE2; el ping se recupera en pocos segundos
+Restaurar:
+   no shutdown
+
+[3.4 Falla de un core completo]
+Apagar el nodo CORE1 desde PNETLab.
+CORE2:
+   show standby brief
+   -> Active en todas las VLANs; la PC sigue saliendo a 8.8.8.8
+Restaurar: encender CORE1.

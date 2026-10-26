@@ -1,0 +1,26 @@
+! ============================================================
+! R-ISP - Router del proveedor / Internet simulado (IOL L3)
+! Enlaces:
+!   e0/0      -> R-EDGE e0/0        (200.0.0.0/30)
+! ============================================================
+enable
+configure terminal
+hostname R-ISP
+no ip domain-lookup
+!
+interface ethernet0/0
+ description Enlace a R-EDGE
+ ip address 200.0.0.2 255.255.255.252
+ no shutdown
+!
+! --- Internet simulado ---
+interface loopback0
+ description Internet simulado (DNS publico)
+ ip address 8.8.8.8 255.255.255.255
+!
+! --- Rutas de retorno hacia la red empresarial ---
+ip route 192.168.0.0 255.255.0.0 200.0.0.1
+ip route 10.0.0.0 255.0.0.0 200.0.0.1
+!
+end
+copy running-config startup-config

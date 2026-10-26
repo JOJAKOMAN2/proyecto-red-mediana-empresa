@@ -1,0 +1,129 @@
+! ============================================================
+! CORE1 - Switch L3 (IOL L2 / L3 en PNETLab)
+! Rol: HSRP activo y root STP de VLAN 10, 30 y 99
+! Enlaces:
+!   e0/0      -> R-EDGE e0/2        (10.0.0.0/30, routed)
+!   e0/1-2    -> CORE2 e0/1-2       (EtherChannel Po1, LACP)
+!   e0/3      -> SW-ACC1 e0/0       (trunk)
+!   e1/0      -> SW-ACC2 e0/3       (trunk)
+! ============================================================
+enable
+configure terminal
+hostname CORE1
+ip routing
+no ip domain-lookup
+spanning-tree mode rapid-pvst
+spanning-tree vlan 10,30,99 root primary
+spanning-tree vlan 20,40 root secondary
+!
+vlan 10
+ name VENTAS
+vlan 20
+ name TI
+vlan 30
+ name FINANZAS
+vlan 40
+ name GERENCIA
+vlan 99
+ name GESTION
+!
+! --- EtherChannel hacia CORE2 (LACP) ---
+interface range ethernet0/1-2
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 1 mode active
+ no shutdown
+interface port-channel 1
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+!
+! --- Trunks hacia switches de acceso ---
+interface ethernet0/3
+ description Trunk a SW-ACC1 e0/0
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+interface ethernet1/0
+ description Trunk a SW-ACC2 e0/3
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+!
+! --- Enlace enrutado hacia R-EDGE ---
+interface ethernet0/0
+ description Enlace a R-EDGE e0/2
+ no switchport
+ ip address 10.0.0.1 255.255.255.252
+ no shutdown
+!
+! --- ACLs de seguridad ---
+! Las ACLs no guardan estado: se permite el retorno de sesiones iniciadas
+! por GERENCIA (acceso total) antes de las denegaciones.
+ip access-list extended ACL_VENTAS
+ permit tcp 192.168.10.0 0.0.0.255 192.168.40.0 0.0.0.255 established
+ permit icmp 192.168.10.0 0.0.0.255 192.168.40.0 0.0.0.255 echo-reply
+ deny ip 192.168.10.0 0.0.0.255 192.168.30.0 0.0.0.255
+ deny ip 192.168.10.0 0.0.0.255 192.168.40.0 0.0.0.255
+ deny ip 192.168.10.0 0.0.0.255 192.168.99.0 0.0.0.255
+ permit ip any any
+ip access-list extended ACL_FINANZAS
+ deny ip 192.168.30.0 0.0.0.255 192.168.10.0 0.0.0.255
+ deny ip 192.168.30.0 0.0.0.255 192.168.99.0 0.0.0.255
+ permit ip any any
+!
+! --- SVIs + HSRP ---
+interface vlan 10
+ description VENTAS
+ ip address 192.168.10.2 255.255.255.0
+ ip access-group ACL_VENTAS in
+ standby 10 ip 192.168.10.1
+ standby 10 priority 110
+ standby 10 preempt
+ no shutdown
+interface vlan 20
+ description TI
+ ip address 192.168.20.2 255.255.255.0
+ standby 20 ip 192.168.20.1
+ standby 20 priority 100
+ standby 20 preempt
+ no shutdown
+interface vlan 30
+ description FINANZAS
+ ip address 192.168.30.2 255.255.255.0
+ ip access-group ACL_FINANZAS in
+ standby 30 ip 192.168.30.1
+ standby 30 priority 110
+ standby 30 preempt
+ no shutdown
+interface vlan 40
+ description GERENCIA
+ ip address 192.168.40.2 255.255.255.0
+ standby 40 ip 192.168.40.1
+ standby 40 priority 100
+ standby 40 preempt
+ no shutdown
+interface vlan 99
+ description GESTION
+ ip address 192.168.99.2 255.255.255.0
+ standby 99 ip 192.168.99.1
+ standby 99 priority 110
+ standby 99 preempt
+ no shutdown
+!
+! --- OSPF area 0 ---
+router ospf 1
+ router-id 1.1.1.1
+ network 10.0.0.0 0.0.0.3 area 0
+ network 192.168.10.0 0.0.0.255 area 0
+ network 192.168.20.0 0.0.0.255 area 0
+ network 192.168.30.0 0.0.0.255 area 0
+ network 192.168.40.0 0.0.0.255 area 0
+ network 192.168.99.0 0.0.0.255 area 0
+ passive-interface vlan 10
+ passive-interface vlan 20
+ passive-interface vlan 30
+ passive-interface vlan 40
+ passive-interface vlan 99
+!
+end
+copy running-config startup-config

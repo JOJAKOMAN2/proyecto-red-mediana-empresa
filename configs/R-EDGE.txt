@@ -1,0 +1,37 @@
+! ============================================================
+! R-EDGE - Router de borde (IOL L3 en PNETLab)
+! Enlaces:
+!   e0/0      -> R-ISP e0/0         (200.0.0.0/30)
+!   e0/2      -> CORE1 e0/0         (10.0.0.0/30)
+!   e0/1      -> CORE2 e0/0         (10.0.0.4/30)
+! ============================================================
+enable
+configure terminal
+hostname R-EDGE
+no ip domain-lookup
+!
+interface ethernet0/0
+ description Enlace a R-ISP
+ ip address 200.0.0.1 255.255.255.252
+ no shutdown
+interface ethernet0/2
+ description Enlace a CORE1 e0/0
+ ip address 10.0.0.2 255.255.255.252
+ no shutdown
+interface ethernet0/1
+ description Enlace a CORE2 e0/0
+ ip address 10.0.0.6 255.255.255.252
+ no shutdown
+!
+! --- Ruta por defecto hacia el ISP ---
+ip route 0.0.0.0 0.0.0.0 200.0.0.2
+!
+! --- OSPF area 0 + propagacion de la ruta por defecto ---
+router ospf 1
+ router-id 3.3.3.3
+ network 10.0.0.0 0.0.0.3 area 0
+ network 10.0.0.4 0.0.0.3 area 0
+ default-information originate
+!
+end
+copy running-config startup-config

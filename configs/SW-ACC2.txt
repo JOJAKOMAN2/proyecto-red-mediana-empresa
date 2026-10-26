@@ -1,0 +1,60 @@
+! ============================================================
+! SW-ACC2 - Switch de acceso (IOL L2 en PNETLab)
+! Enlaces:
+!   e0/0      -> CORE2 e0/3         (trunk)
+!   e0/3      -> CORE1 e1/0         (trunk)
+!   e0/1      -> PC GERENCIA        (VLAN 40)
+!   e0/2      -> PC FINANZAS        (VLAN 30)
+! ============================================================
+enable
+configure terminal
+hostname SW-ACC2
+no ip domain-lookup
+spanning-tree mode rapid-pvst
+!
+vlan 10
+ name VENTAS
+vlan 20
+ name TI
+vlan 30
+ name FINANZAS
+vlan 40
+ name GERENCIA
+vlan 99
+ name GESTION
+!
+! --- Uplinks (uno a cada core) ---
+interface ethernet0/0
+ description Trunk a CORE2 e0/3
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+interface ethernet0/3
+ description Trunk a CORE1 e1/0
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+!
+! --- Puertos de acceso ---
+interface ethernet0/1
+ description PC GERENCIA
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+ no shutdown
+interface ethernet0/2
+ description PC FINANZAS
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+ no shutdown
+!
+! --- Gestion ---
+interface vlan 99
+ description GESTION
+ ip address 192.168.99.12 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.99.1
+!
+end
+copy running-config startup-config
