@@ -5,11 +5,6 @@ Implementada en PNETLab con imágenes IOL (L2 para los switches, L3 para los rou
 
 ## Integrantes
 
-| Nombre | Matrícula |
-| --- | --- |
-| José Jadiel Gomez | _por completar_ |
-| _por completar_ | _por completar_ |
-
 ## Topología
 
 - `topologia/topologia-pnetlab.png`: captura de la topología en PNETLab.
